@@ -100,11 +100,21 @@ struct MeanSqDeviation <: SemiMetric end
 struct RMSDeviation <: Metric end
 struct NormRMSDeviation <: PreMetric end
 
-struct PeriodicEuclidean{W <: AbstractArray{<: Real}} <: Metric
+abstract type PeriodicMetric <: Metric end
+
+struct PeriodicEuclidean{W <: AbstractArray{<: Real}} <: PeriodicMetric
     periods::W
 end
 
-const metrics = (Euclidean,SqEuclidean,PeriodicEuclidean,Chebyshev,Cityblock,TotalVariation,Minkowski,Hamming,Jaccard,RogersTanimoto,CosineDist,ChiSqDist,KLDivergence,RenyiDivergence,BrayCurtis,JSDivergence,SpanNormDist,GenKLDivergence)
+struct PeriodicCityblock{W <: AbstractArray{<: Real}} <: PeriodicMetric
+    periods::W
+end
+
+struct PeriodicChebyshev{W <: AbstractArray{<: Real}} <: PeriodicMetric
+    periods::W
+end
+
+const metrics = (Euclidean,SqEuclidean,PeriodicEuclidean,Chebyshev,PeriodicChebyshev,Cityblock,PeriodicCityblock,TotalVariation,Minkowski,Hamming,Jaccard,RogersTanimoto,CosineDist,ChiSqDist,KLDivergence,RenyiDivergence,BrayCurtis,JSDivergence,SpanNormDist,GenKLDivergence)
 const UnionMetrics = Union{metrics...}
 
 """
@@ -164,6 +174,10 @@ julia> evaluate(PeriodicEuclidean(L), x, y)
 ```
 """
 PeriodicEuclidean() = PeriodicEuclidean(Int[])
+
+PeriodicCityblock() = PeriodicCityblock(Int[])
+
+PeriodicChebyshev() = PeriodicChebyshev(Int[])
 
 ###########################################################
 #
@@ -281,19 +295,25 @@ eval_end(::Euclidean, s) = sqrt(s)
 euclidean(a::AbstractArray, b::AbstractArray) = Euclidean()(a, b)
 euclidean(a::Number, b::Number) = Euclidean()(a, b)
 
-# PeriodicEuclidean
-Base.eltype(d::PeriodicEuclidean) = eltype(d.periods)
-@inline parameters(d::PeriodicEuclidean) = d.periods
-@inline function eval_op(d::PeriodicEuclidean, ai, bi, p)
+# PeriodicMetrics
+Base.eltype(d::T) where {T <: PeriodicMetric} = eltype(d.periods)
+# @inline parameters(d::T) where {T <: PeriodicMetric} = d.periods would be nice, but specificity
+@inline function periodic_eval_op(d::T, ai, bi, p) where {T <: PeriodicMetric} 
     s1 = abs(ai - bi)
     s2 = mod(s1, p)
     s3 = min(s2, p - s2)
-    abs2(s3)
 end
-@inline function eval_op(d::PeriodicEuclidean, ai, bi)
+@inline function eval_op(d::T, ai, bi) where {T <: PeriodicMetric}
     periods = d.periods
     p = isempty(periods) ? oneunit(eltype(periods)) : first(periods)
     eval_op(d, ai, bi, p)
+end
+
+# PeriodicEuclidean
+@inline parameters(d::PeriodicEuclidean) = d.periods
+@inline function eval_op(d::PeriodicEuclidean, ai, bi, p)
+    s = periodic_eval_op(d, ai, bi, p)
+    abs2(s)
 end
 @inline eval_reduce(::PeriodicEuclidean, s1, s2) = s1 + s2
 @inline eval_end(::PeriodicEuclidean, s) = sqrt(s)
@@ -306,6 +326,17 @@ peuclidean(a::Number, b::Number, p::Real) = PeriodicEuclidean([p])(a, b)
 @inline eval_reduce(::Cityblock, s1, s2) = s1 + s2
 cityblock(a::AbstractArray, b::AbstractArray) = Cityblock()(a, b)
 cityblock(a::Number, b::Number) = Cityblock()(a, b)
+
+# PeriodicCityblock
+@inline parameters(d::PeriodicCityblock) = d.periods
+@inline function eval_op(d::PeriodicCityblock, ai, bi, p)
+    s = periodic_eval_op(d, ai, bi, p)
+    abs(s)
+end
+@inline eval_reduce(::PeriodicCityblock, s1, s2) = s1 + s2
+pcityblock(a::AbstractArray, b::AbstractArray, p::AbstractArray{<: Real}) =
+    PeriodicCityblock(p)(a, b)
+pcityblock(a::Number, b::Number, p::Real) = PeriodicCityblock([p])(a, b)
 
 # Total variation
 @inline eval_op(::TotalVariation, ai, bi) = abs(ai - bi)
@@ -321,6 +352,18 @@ totalvariation(a::Number, b::Number) = TotalVariation()(a, b)
 @inline Base.@propagate_inbounds eval_start(::Chebyshev, a::AbstractArray, b::AbstractArray) = abs(a[1] - b[1])
 chebyshev(a::AbstractArray, b::AbstractArray) = Chebyshev()(a, b)
 chebyshev(a::Number, b::Number) = Chebyshev()(a, b)
+
+# PeriodicChebyshev
+@inline parameters(d::PeriodicChebyshev) = d.periods
+@inline function eval_op(d::PeriodicChebyshev, ai, bi, p)
+    s = periodic_eval_op(d, ai, bi, p)
+    abs(s)
+end
+@inline eval_reduce(::PeriodicChebyshev, s1, s2) = max(s1, s2)
+@inline Base.@propagate_inbounds eval_start(d::PeriodicChebyshev, a::AbstractArray, b::AbstractArray) = abs(periodic_eval_op(d, a[1], b[1], d.periods[1]))
+pchebychev(a::AbstractArray, b::AbstractArray, p::AbstractArray{<: Real}) =
+    PeriodicChebyshev(p)(a, b)
+pchebychev(a::Number, b::Number, p::Real) = PeriodicChebyshev([p])(a, b)
 
 # Minkowski
 @inline eval_op(dist::Minkowski, ai, bi) = abs(ai - bi).^dist.p

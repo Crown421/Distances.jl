@@ -89,6 +89,8 @@ end
     w = rand(T, n)
 
     test_metricity(PeriodicEuclidean(w), x, y, z)
+    test_metricity(PeriodicCityblock(w), x, y, z)
+    test_metricity(PeriodicChebyshev(w), x, y, z)
     test_metricity(WeightedSqEuclidean(w), x, y, z)
     test_metricity(WeightedEuclidean(w), x, y, z)
     test_metricity(WeightedCityblock(w), x, y, z)
@@ -132,6 +134,10 @@ end
     @test hamming(a, b) == 1
     @test peuclidean(a, b, 0.5) == 0
     @test peuclidean(a, b, 2) == 1.0
+    @test pchebychev(a, b, 0.5) == 0
+    @test pchebychev(a, b, 2) == 1.0
+    @test pcityblock(a, b, 0.5) == 0
+    @test pcityblock(a, b, 2) == 1.0
 
     bt = [true, false, true]
     bf = [false, true, true]
@@ -154,6 +160,13 @@ end
             @test peuclidean(x, y, fill(10.0, 4)) == sqrt(37)
             @test peuclidean(x - vec(y), zero(y), fill(10.0, 4)) == peuclidean(x, y, fill(10.0, 4))
             @test peuclidean(x, y, [10.0, 10.0, 10.0, Inf]) == sqrt(57)
+            @test pchebychev(x, y, fill(10.0, 4)) == 4.0
+            @test pchebychev(x - vec(y), zero(y), fill(10.0, 4)) == pchebychev(x, y, fill(10.0, 4))
+            @test pchebychev(x, y, [10.0, 10.0, 10.0, Inf]) == 6.0
+            @test pcityblock(x, y, fill(10.0, 4)) == 11.0
+            @test pcityblock(x - vec(y), zero(y), fill(10.0, 4)) == pcityblock(x, y, fill(10.0, 4))
+            @test pcityblock(x, y, [10.0, 10.0, 10.0, Inf]) == 13.0
+
             @test_throws DimensionMismatch cosine_dist(1.0:2, 1.0:3)
             @test cosine_dist(x, y) ≈ (1.0 - 112. / sqrt(19530.0))
             x_int, y_int = Int64.(x), Int64.(y)
@@ -272,6 +285,10 @@ end #testset
         @test isa(whamming(a, b, w), T)
         @test peuclidean(a, b, w) == 0.0
         @test isa(peuclidean(a, b, w), T)
+        @test pcityblock(a, b, w) == 0.0
+        @test isa(pcityblock(a, b, w), T)
+        @test pchebychev(a, b, w) == 0.0
+        @test isa(pchebychev(a, b, w), T)
     end
 end # testset
 
@@ -472,6 +489,8 @@ end
     test_colwise(WeightedMinkowski(w, 2.5), X, Y, T)
     test_colwise(WeightedHamming(w), A, B, T)
     test_colwise(PeriodicEuclidean(w), X, Y, T)
+    test_colwise(PeriodicCityblock(w), X, Y, T)
+    test_colwise(PeriodicChebyshev(w), X, Y, T)
 
     Q = rand(T, m, m)
     Q = Q * Q'  # make sure Q is positive-definite
@@ -549,6 +568,8 @@ end
     test_pairwise(WeightedMinkowski(w, 2.5), X, Y, T)
     test_pairwise(WeightedHamming(w), A, B, T)
     test_pairwise(PeriodicEuclidean(w), X, Y, T)
+    test_pairwise(PeriodicCityblock(w), X, Y, T)
+    test_pairwise(PeriodicChebyshev(w), X, Y, T)
 
     Q = rand(m, m)
     Q = Q * Q'  # make sure Q is positive-definite
